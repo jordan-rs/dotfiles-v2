@@ -1,1 +1,942 @@
-holder
+#!/usr/bin/env bash
+
+# ~/.macos — macOS Tahoe (26) Edition
+#
+# Adapted from Mathias Bynens' canonical .macos script
+# (https://mths.be/macos) with updates for macOS 26 Tahoe.
+#
+# RESEARCH NOTES — READ BEFORE RUNNING
+# ─────────────────────────────────────
+# This file was assembled in March 2026 based on community testing,
+# Apple documentation, forum reports, and the ryansummerscripts/macOS-Defaults
+# project (v1.5, March 2026). Commands are annotated with their known status.
+#
+# STATUS TAGS USED IN THIS FILE:
+#   [VERIFIED-26]   Confirmed working on Tahoe by community reports
+#   [LIKELY-OK]     Same key since Ventura/Sonoma; plausibly still works
+#   [UNCERTAIN]     Key exists but Tahoe behavior not confirmed
+#   [REMOVED-26]    Feature gone in Tahoe — command kept as comment for reference
+#   [REMOVED-OLDER] Feature removed before Tahoe (Big Sur, Monterey, etc.)
+#   [SIP-PROTECTED] Requires SIP disabled to work; risky on modern Macs
+#   [DEPRECATED]    Apple has flagged the underlying tool as deprecated
+#
+# IMPORTANT TAHOE-SPECIFIC NOTES:
+#   • Launchpad has been REMOVED and replaced by "Apps" in Spotlight.
+#     The Launchpad gesture and hot corner value (11) are dead.
+#   • Dashboard has been gone since macOS Catalina (10.15). All Dashboard
+#     commands are no-ops or errors.
+#   • "System Preferences" is now "System Settings" (since Ventura).
+#     The old AppleScript alias still works for now but is not guaranteed.
+#   • Many SIP-protected defaults paths can no longer be written to without
+#     disabling SIP. Avoid on production machines.
+#   • Apple Silicon Macs handle sleep images differently; the old
+#     /private/var/vm/sleepimage path may not exist.
+#   • The Spotlight orderedItems key has changed since Yosemite and several
+#     category names are no longer valid. See the Spotlight section.
+#   • `tmutil disablelocal` was removed from macOS a long time ago.
+#   • `systemsetup` is deprecated on Apple Silicon (Apple intends to remove it).
+#   • Third-party app sections (SizeUp, Spectacle, Tweetbot, Twitter) have
+#     been moved to the bottom and heavily caveated; those apps are mostly
+#     dead or changed.
+
+
+###############################################################################
+# Pre-flight                                                                  #
+###############################################################################
+
+# Close any open System Settings panes to prevent them from overriding
+# settings we're about to change. The old "System Preferences" alias still
+# works as of 26.3; Apple has not yet removed it from AppleScript. [LIKELY-OK]
+osascript -e 'tell application "System Settings" to quit' 2>/dev/null
+osascript -e 'tell application "System Preferences" to quit' 2>/dev/null
+
+# Ask for the administrator password upfront
+sudo -v
+
+# Keep-alive: update existing `sudo` timestamp until script has finished
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+
+###############################################################################
+# General UI/UX                                                               #
+###############################################################################
+
+# Set computer name (as done via System Settings → General → Sharing)
+# Uncomment and replace with your values:
+#sudo scutil --set ComputerName "mymac"
+#sudo scutil --set HostName "mymac"
+#sudo scutil --set LocalHostName "mymac"
+#sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "mymac"
+
+# Disable the startup chime on Intel Macs. [VERIFIED-26 Intel only]
+# On Apple Silicon the startup sound is controlled in System Settings →
+# Sound → "Play sound on startup". There is no known reliable defaults key
+# for this on Apple Silicon as of 26.3.
+# sudo nvram SystemAudioVolume=" "    # Intel only — may not work on AS
+
+# ── Liquid Glass & Appearance (Tahoe-specific) ────────────────────────────
+
+# Reduce transparency — this is the primary way to tone down Liquid Glass.
+# Enabling this disables all Liquid Glass effects and restores a more
+# traditional opaque menu bar and Dock. [VERIFIED-26]
+# Note: If you set this to true, the Liquid Glass setting in System Settings
+# → Appearance becomes unavailable (Apple's behavior, not a bug).
+defaults write com.apple.universalaccess reduceTransparency -bool false
+# ↑ Set to `true` to disable Liquid Glass effects entirely.
+
+# Increase contrast (automatically also enables reduceTransparency). [VERIFIED-26]
+# This adds outlines to controls and increases overall contrast.
+defaults write com.apple.universalaccess increaseContrast -bool false
+
+# Disable Liquid Glass per individual app. [VERIFIED-26]
+# Replace <bundle-id> with the app's bundle identifier, e.g.:
+#   defaults write com.apple.clock com.apple.SwiftUI.DisableSolarium -bool true
+# This has been confirmed to work for SwiftUI-based apps. Non-SwiftUI
+# apps ignore this key. Set to `false` to re-enable Liquid Glass in that app.
+# Examples (uncomment as desired):
+# defaults write com.apple.clock com.apple.SwiftUI.DisableSolarium -bool true
+# defaults write com.apple.Notes com.apple.SwiftUI.DisableSolarium -bool true
+# defaults write com.apple.reminders com.apple.SwiftUI.DisableSolarium -bool true
+
+# Icon & widget style in Appearance. [UNCERTAIN]
+# As of 26.3, no confirmed `defaults write` key exists for the icon style
+# (Default / Dark / Clear / Automatic) shown in System Settings → Appearance.
+# This is stored somewhere in com.apple.dock or NSGlobalDomain but has not
+# been reliably documented by the community. Do NOT guess keys here.
+# You can set dark mode with the standard key:
+# defaults write NSGlobalDomain AppleInterfaceStyle -string "Dark"
+# (Remove the key entirely to go back to light mode):
+# defaults delete NSGlobalDomain AppleInterfaceStyle
+
+# Set highlight color. [LIKELY-OK]
+# Default macOS blue = remove the key. Other colors use RGB floats 0–1.
+# defaults write NSGlobalDomain AppleHighlightColor -string "0.764700 0.976500 0.568600"
+
+# Set sidebar icon size to medium (1=small, 2=medium, 3=large). [LIKELY-OK]
+defaults write NSGlobalDomain NSTableViewDefaultSizeMode -int 2
+
+# Always show scrollbars. [VERIFIED-26]
+# Possible values: WhenScrolling, Automatic, Always
+defaults write NSGlobalDomain AppleShowScrollBars -string "Always"
+
+# Increase window resize speed for Cocoa applications. [LIKELY-OK]
+defaults write NSGlobalDomain NSWindowResizeTime -float 0.001
+
+# Expand save panel by default. [VERIFIED-26]
+defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode -bool true
+defaults write NSGlobalDomain NSNavPanelExpandedStateForSaveMode2 -bool true
+
+# Expand print panel by default. [VERIFIED-26]
+defaults write NSGlobalDomain PMPrintingExpandedStateForPrint -bool true
+defaults write NSGlobalDomain PMPrintingExpandedStateForPrint2 -bool true
+
+# Save to disk (not to iCloud) by default. [VERIFIED-26]
+defaults write NSGlobalDomain NSDocumentSaveNewDocumentsToCloud -bool false
+
+# Automatically quit printer app once print jobs complete. [LIKELY-OK]
+defaults write com.apple.print.PrintingPrefs "Quit When Finished" -bool true
+
+# Disable the "Are you sure you want to open this application?" dialog.
+# NOTE: This writes to a SIP-adjacent path and may silently fail on Tahoe
+# with SIP enabled, depending on your setup. [UNCERTAIN on Tahoe]
+defaults write com.apple.LaunchServices LSQuarantine -bool false
+
+# Remove duplicates in the "Open With" menu. [LIKELY-OK]
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+  -kill -r -domain local -domain system -domain user
+
+# Disable Resume system-wide (windows don't restore on relaunch). [LIKELY-OK]
+defaults write com.apple.systempreferences NSQuitAlwaysKeepsWindows -bool false
+# Also try the global domain variant:
+defaults write NSGlobalDomain NSQuitAlwaysKeepsWindows -bool false
+
+# Disable automatic termination of inactive apps. [LIKELY-OK]
+defaults write NSGlobalDomain NSDisableAutomaticTermination -bool true
+
+# Reveal IP address, hostname, OS version when clicking the clock in the
+# login window. [LIKELY-OK]
+sudo defaults write /Library/Preferences/com.apple.loginwindow AdminHostInfo HostName
+
+# Disable automatic capitalization (annoying when typing code). [VERIFIED-26]
+defaults write NSGlobalDomain NSAutomaticCapitalizationEnabled -bool false
+
+# Disable smart dashes. [VERIFIED-26]
+defaults write NSGlobalDomain NSAutomaticDashSubstitutionEnabled -bool false
+
+# Disable automatic period substitution. [VERIFIED-26]
+defaults write NSGlobalDomain NSAutomaticPeriodSubstitutionEnabled -bool false
+
+# Disable smart quotes. [VERIFIED-26]
+defaults write NSGlobalDomain NSAutomaticQuoteSubstitutionEnabled -bool false
+
+# Disable auto-correct. [VERIFIED-26]
+defaults write NSGlobalDomain NSAutomaticSpellingCorrectionEnabled -bool false
+
+# REMOVED: Disabling Notification Center via launchctl unload is no longer
+# possible on macOS since Big Sur due to system integrity protections.
+# [REMOVED-OLDER]
+# launchctl unload -w /System/Library/LaunchAgents/com.apple.notificationcenterui.plist
+
+
+###############################################################################
+# Trackpad, Mouse, Keyboard, Bluetooth, and Input                            #
+###############################################################################
+
+# Trackpad: enable tap to click for this user and for the login screen. [VERIFIED-26]
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
+defaults -currentHost write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
+defaults write NSGlobalDomain com.apple.mouse.tapBehavior -int 1
+
+# Trackpad: map bottom-right corner to right-click. [LIKELY-OK]
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadCornerSecondaryClick -int 2
+defaults write com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadRightClick -bool true
+defaults -currentHost write NSGlobalDomain com.apple.trackpad.trackpadCornerClickBehavior -int 1
+defaults -currentHost write NSGlobalDomain com.apple.trackpad.enableSecondaryClick -bool true
+
+# Disable "natural" (Lion-style) scrolling. [VERIFIED-26]
+defaults write NSGlobalDomain com.apple.swipescrolldirection -bool false
+
+# Increase sound quality for Bluetooth headphones/headsets. [UNCERTAIN]
+# The Bluetooth audio codec stack changed significantly; this key may no
+# longer have an effect. Keeping it here for reference.
+defaults write com.apple.BluetoothAudioAgent "Apple Bitpool Min (editable)" -int 40
+
+# Enable full keyboard access for all controls
+# (e.g. enable Tab in modal dialogs). [LIKELY-OK]
+# 0 = text boxes and lists only, 3 = all controls
+defaults write NSGlobalDomain AppleKeyboardUIMode -int 3
+
+# Use scroll gesture with Ctrl to zoom. [LIKELY-OK]
+defaults write com.apple.universalaccess closeViewScrollWheelToggle -bool true
+defaults write com.apple.universalaccess HIDScrollZoomModifierMask -int 262144
+
+# Follow keyboard focus while zoomed in. [LIKELY-OK]
+defaults write com.apple.universalaccess closeViewZoomFollowsFocus -bool true
+
+# Disable press-and-hold for keys in favor of key repeat. [VERIFIED-26]
+defaults write NSGlobalDomain ApplePressAndHoldEnabled -bool false
+
+# Set keyboard repeat rate. Lower is faster. [VERIFIED-26]
+# InitialKeyRepeat = delay before repeat starts; KeyRepeat = repeat interval.
+# Minimum values via UI: InitialKeyRepeat=15, KeyRepeat=2.
+# These values go below UI minimums:
+defaults write NSGlobalDomain KeyRepeat -int 1
+defaults write NSGlobalDomain InitialKeyRepeat -int 10
+
+# Set language and text formats. Adjust to your locale. [LIKELY-OK]
+# defaults write NSGlobalDomain AppleLanguages -array "en-US"
+# defaults write NSGlobalDomain AppleLocale -string "en_US@currency=USD"
+# defaults write NSGlobalDomain AppleMeasurementUnits -string "Inches"
+# defaults write NSGlobalDomain AppleMetricUnits -bool false
+
+# Show language menu in the top right corner of the boot screen. [LIKELY-OK]
+# sudo defaults write /Library/Preferences/com.apple.loginwindow showInputMenu -bool true
+
+# Set the timezone. See `sudo systemsetup -listtimezones` for values. [DEPRECATED on AS]
+# NOTE: `systemsetup` is deprecated on Apple Silicon and may be removed in a
+# future macOS release. Use System Settings → General → Date & Time instead,
+# or the `timed` service. Keeping here for Intel/compatibility reference.
+# sudo systemsetup -settimezone "America/Chicago" > /dev/null
+
+
+###############################################################################
+# Energy Saving                                                               #
+###############################################################################
+
+# Enable lid wakeup. [LIKELY-OK]
+sudo pmset -a lidwake 1
+
+# Restart automatically on power loss. [LIKELY-OK]
+sudo pmset -a autorestart 1
+
+# Restart automatically if the computer freezes. [DEPRECATED on AS]
+# `systemsetup -setrestartfreeze` is deprecated on Apple Silicon.
+# sudo systemsetup -setrestartfreeze on
+
+# Sleep the display after N minutes. [VERIFIED-26]
+sudo pmset -a displaysleep 15
+
+# Disable machine sleep while charging. [LIKELY-OK]
+sudo pmset -c sleep 0
+
+# Set machine sleep to 5 minutes on battery. [LIKELY-OK]
+sudo pmset -b sleep 5
+
+# Set standby delay to 24 hours (default is 1 hour). [LIKELY-OK]
+sudo pmset -a standbydelay 86400
+
+# Hibernation mode. [LIKELY-OK, Apple Silicon caveat below]
+# 0: Disable hibernation (speeds up entering sleep mode)
+# 3: Copy RAM to disk so state can be restored after a power failure
+# 25: Hibernate immediately, purge RAM on sleep (default on Apple Silicon)
+# NOTE: On Apple Silicon, the memory architecture is different. Changing
+# hibernatemode to 0 on AS Macs may not have the same effect as on Intel.
+# Proceed with caution and test before relying on this.
+# sudo pmset -a hibernatemode 0
+
+# Remove the sleep image to save disk space (Intel only). [REMOVED on AS]
+# On Apple Silicon, /private/var/vm/sleepimage does not exist.
+# The following commands are Intel-only and should be skipped on AS:
+# sudo rm -f /private/var/vm/sleepimage
+# sudo touch /private/var/vm/sleepimage
+# sudo chflags uchg /private/var/vm/sleepimage
+
+
+###############################################################################
+# Screen                                                                      #
+###############################################################################
+
+# Require password immediately after sleep or screen saver begins. [VERIFIED-26]
+defaults write com.apple.screensaver askForPassword -int 1
+defaults write com.apple.screensaver askForPasswordDelay -int 0
+
+# Save screenshots to the Desktop. [VERIFIED-26]
+# NOTE: A known Tahoe bug causes screenshots to save as PDF even when set
+# to PNG, if "Show Floating Thumbnail" is enabled. The fix is to disable
+# floating thumbnails (System Settings → Screenshot or Command+Shift+5 →
+# Options). The defaults key below for type still works correctly.
+defaults write com.apple.screencapture location -string "${HOME}/Desktop"
+
+# Save screenshots in PNG format. [VERIFIED-26]
+# Other options: BMP, GIF, JPG, TIFF
+# NOTE: PDF screenshots are broken in Tahoe when floating thumbnails are on.
+# Stick with PNG or JPG for reliability.
+defaults write com.apple.screencapture type -string "png"
+
+# Disable shadow in screenshots. [VERIFIED-26]
+defaults write com.apple.screencapture disable-shadow -bool true
+
+# Enable subpixel font rendering on non-Apple LCDs. [UNCERTAIN on Tahoe]
+# Apple removed subpixel antialiasing in Mojave for Retina displays, but this
+# key still applies to external non-Retina monitors. On Tahoe with Apple
+# Silicon, results may vary.
+defaults write NSGlobalDomain AppleFontSmoothing -int 1
+
+# Enable HiDPI display modes (requires restart). [SIP-PROTECTED]
+# This path is under SIP on modern macOS. Will silently fail with SIP on.
+# sudo defaults write /Library/Preferences/com.apple.windowserver DisplayResolutionEnabled -bool true
+
+
+###############################################################################
+# Finder                                                                      #
+###############################################################################
+
+# Allow quitting Finder via ⌘+Q (also hides desktop icons). [VERIFIED-26]
+defaults write com.apple.finder QuitMenuItem -bool true
+
+# Disable window animations and Get Info animations. [LIKELY-OK]
+defaults write com.apple.finder DisableAllAnimations -bool true
+
+# Set default location for new Finder windows. [VERIFIED-26]
+# PfDe = Desktop, PfHm = Home folder, PfLo = custom path (set NewWindowTargetPath)
+defaults write com.apple.finder NewWindowTarget -string "PfHm"
+defaults write com.apple.finder NewWindowTargetPath -string "file://${HOME}/"
+
+# Show icons for hard drives, servers, and removable media on the desktop. [VERIFIED-26]
+defaults write com.apple.finder ShowExternalHardDrivesOnDesktop -bool true
+defaults write com.apple.finder ShowHardDrivesOnDesktop -bool true
+defaults write com.apple.finder ShowMountedServersOnDesktop -bool true
+defaults write com.apple.finder ShowRemovableMediaOnDesktop -bool true
+
+# Show hidden files by default. [VERIFIED-26]
+# defaults write com.apple.finder AppleShowAllFiles -bool true
+
+# Show all filename extensions. [VERIFIED-26]
+defaults write NSGlobalDomain AppleShowAllExtensions -bool true
+
+# Show status bar. [VERIFIED-26]
+defaults write com.apple.finder ShowStatusBar -bool true
+
+# Show path bar. [VERIFIED-26]
+defaults write com.apple.finder ShowPathbar -bool true
+
+# Display full POSIX path as Finder window title. [LIKELY-OK]
+defaults write com.apple.finder _FXShowPosixPathInTitle -bool true
+
+# Keep folders on top when sorting by name. [VERIFIED-26]
+defaults write com.apple.finder _FXSortFoldersFirst -bool true
+
+# Also keep folders on top on Desktop. [LIKELY-OK]
+defaults write com.apple.finder _FXSortFoldersFirstOnDesktop -bool true
+
+# When performing a search, search the current folder by default. [VERIFIED-26]
+defaults write com.apple.finder FXDefaultSearchScope -string "SCcf"
+
+# Disable the warning when changing a file extension. [VERIFIED-26]
+defaults write com.apple.finder FXEnableExtensionChangeWarning -bool false
+
+# Enable spring loading for directories. [LIKELY-OK]
+defaults write NSGlobalDomain com.apple.springing.enabled -bool true
+
+# Remove the spring loading delay for directories. [LIKELY-OK]
+defaults write NSGlobalDomain com.apple.springing.delay -float 0
+
+# Avoid creating .DS_Store files on network or USB volumes. [VERIFIED-26]
+defaults write com.apple.desktopservices DSDontWriteNetworkStores -bool true
+defaults write com.apple.desktopservices DSDontWriteUSBStores -bool true
+
+# Disable disk image verification. [LIKELY-OK]
+defaults write com.apple.frameworks.diskimages skip-verify -bool true
+defaults write com.apple.frameworks.diskimages skip-verify-locked -bool true
+defaults write com.apple.frameworks.diskimages skip-verify-remote -bool true
+
+# Automatically open a new Finder window when a volume is mounted. [LIKELY-OK]
+defaults write com.apple.frameworks.diskimages auto-open-ro-root -bool true
+defaults write com.apple.frameworks.diskimages auto-open-rw-root -bool true
+defaults write com.apple.finder OpenWindowForNewRemovableDisk -bool true
+
+# Use list view in all Finder windows by default. [VERIFIED-26]
+# Four-letter codes: icnv (icon), Nlsv (list), clmv (column), glyv (gallery)
+defaults write com.apple.finder FXPreferredViewStyle -string "Nlsv"
+
+# Disable the warning before emptying the Trash. [VERIFIED-26]
+defaults write com.apple.finder WarnOnEmptyTrash -bool false
+
+# Show the ~/Library folder. [VERIFIED-26]
+chflags nohidden ~/Library && xattr -d com.apple.FinderInfo ~/Library 2>/dev/null
+
+# Show the /Volumes folder. [VERIFIED-26]
+sudo chflags nohidden /Volumes
+
+# Expand the following File Info panes: General, Open With, Sharing & Permissions. [LIKELY-OK]
+defaults write com.apple.finder FXInfoPanesExpanded -dict \
+  General -bool true \
+  OpenWith -bool true \
+  Privileges -bool true
+
+# Folder tag colors: Tahoe introduces colored folders via tags.
+# There is no confirmed `defaults write` key for this as of 26.3.
+# Colors are applied through the Finder UI or `xattr`/tag APIs.
+# The color of a tagged folder is part of the tag's definition, not a
+# per-folder defaults key. Set via: Finder → right-click folder → Tags,
+# or: tag -a "Red" /path/to/folder
+
+
+###############################################################################
+# Dock                                                                        #
+###############################################################################
+
+# Enable highlight hover effect for the grid view of a stack (Dock). [LIKELY-OK]
+defaults write com.apple.dock mouse-over-hilite-stack -bool true
+
+# Set the icon size of Dock items to 48 pixels (Tahoe default is larger). [VERIFIED-26]
+defaults write com.apple.dock tilesize -int 48
+
+# Change minimize/maximize window effect. [VERIFIED-26]
+# Options: genie, scale, suck
+defaults write com.apple.dock mineffect -string "scale"
+
+# Minimize windows into their application's icon. [VERIFIED-26]
+defaults write com.apple.dock minimize-to-application -bool true
+
+# Enable spring loading for all Dock items. [LIKELY-OK]
+defaults write com.apple.dock enable-spring-load-actions-on-all-items -bool true
+
+# Show indicator lights for open applications in the Dock. [VERIFIED-26]
+defaults write com.apple.dock show-process-indicators -bool true
+
+# Don't animate opening applications from the Dock. [VERIFIED-26]
+defaults write com.apple.dock launchanim -bool false
+
+# Speed up Mission Control animations. [LIKELY-OK]
+defaults write com.apple.dock expose-animation-duration -float 0.1
+
+# Don't group windows by application in Mission Control. [LIKELY-OK]
+defaults write com.apple.dock expose-group-by-app -bool false
+
+# Don't automatically rearrange Spaces based on most recent use. [VERIFIED-26]
+defaults write com.apple.dock mru-spaces -bool false
+
+# Remove the auto-hiding Dock delay. [VERIFIED-26]
+defaults write com.apple.dock autohide-delay -float 0
+
+# Remove the animation when hiding/showing the Dock. [VERIFIED-26]
+defaults write com.apple.dock autohide-time-modifier -float 0
+
+# Automatically hide and show the Dock. [VERIFIED-26]
+defaults write com.apple.dock autohide -bool true
+
+# Make Dock icons of hidden applications translucent. [VERIFIED-26]
+defaults write com.apple.dock showhidden -bool true
+
+# Don't show recent applications in Dock. [VERIFIED-26]
+defaults write com.apple.dock show-recents -bool false
+
+# Show only open applications in the Dock (hide persistent apps).
+# Useful if you launch apps only from Spotlight. [LIKELY-OK]
+# defaults write com.apple.dock static-only -bool true
+
+# Wipe all (default) app icons from the Dock.
+# Only useful during fresh Mac setup. [VERIFIED-26]
+# defaults write com.apple.dock persistent-apps -array
+
+# REMOVED: Dashboard-related Dock settings. Dashboard was removed in macOS
+# Catalina (10.15). These keys do nothing on Tahoe. [REMOVED-OLDER]
+# defaults write com.apple.dashboard mcx-disabled -bool true
+# defaults write com.apple.dock dashboard-in-overlay -bool true
+
+# REMOVED: Launchpad gesture. Launchpad was removed in macOS Tahoe (26).
+# The gesture (pinch with 4/5 fingers) now triggers the Spotlight Apps view.
+# There is no defaults key to control this. [REMOVED-26]
+# defaults write com.apple.dock showLaunchpadGestureEnabled -int 0
+
+# Hot corners. [VERIFIED-26 — with caveats below]
+# Possible values:
+#  0: no-op
+#  2: Mission Control
+#  3: Show application windows
+#  4: Desktop
+#  5: Start screen saver
+#  6: Disable screen saver
+#  7: Dashboard  ← REMOVED (Dashboard gone since Catalina)
+# 10: Put display to sleep
+# 11: Launchpad  ← REMOVED (Launchpad gone in Tahoe 26)
+# 12: Notification Center
+# 13: Lock Screen
+# 14: Quick Note (added in Monterey)
+#
+# Top left screen corner → Mission Control
+defaults write com.apple.dock wvous-tl-corner -int 2
+defaults write com.apple.dock wvous-tl-modifier -int 0
+# Top right screen corner → Desktop
+defaults write com.apple.dock wvous-tr-corner -int 4
+defaults write com.apple.dock wvous-tr-modifier -int 0
+# Bottom left screen corner → Start screen saver
+defaults write com.apple.dock wvous-bl-corner -int 5
+defaults write com.apple.dock wvous-bl-modifier -int 0
+# Bottom right screen corner → Lock Screen
+defaults write com.apple.dock wvous-br-corner -int 13
+defaults write com.apple.dock wvous-br-modifier -int 0
+
+# Add a spacer to the left side of the Dock (where apps are). [LIKELY-OK]
+# defaults write com.apple.dock persistent-apps -array-add '{tile-data={}; tile-type="spacer-tile";}'
+
+# Add a spacer to the right side of the Dock (where Trash is). [LIKELY-OK]
+# defaults write com.apple.dock persistent-others -array-add '{tile-data={}; tile-type="spacer-tile";}'
+
+
+###############################################################################
+# Spotlight                                                                   #
+###############################################################################
+
+# IMPORTANT TAHOE CHANGES TO SPOTLIGHT:
+# Spotlight is now a much more powerful app launcher (it replaced Launchpad).
+# It includes:
+#   • Clipboard History (Cmd+Space, then Cmd+4) — new in Tahoe
+#   • Quick Actions (run Shortcuts directly)
+#   • Applications view (Cmd+1) — replaces Launchpad
+#   • Filter bar triggered by typing "/" in Spotlight
+#
+# Many of the category names in the old `orderedItems` array have changed.
+# The following names are confirmed to still exist on Tahoe, but the list
+# is shorter than in older macOS; some categories were removed or merged.
+# Adjust to your preferences.
+
+defaults write com.apple.spotlight orderedItems -array \
+  '{"enabled" = 1;"name" = "APPLICATIONS";}' \
+  '{"enabled" = 1;"name" = "SYSTEM_PREFS";}' \
+  '{"enabled" = 1;"name" = "DIRECTORIES";}' \
+  '{"enabled" = 1;"name" = "PDF";}' \
+  '{"enabled" = 1;"name" = "FONTS";}' \
+  '{"enabled" = 1;"name" = "DOCUMENTS";}' \
+  '{"enabled" = 1;"name" = "MESSAGES";}' \
+  '{"enabled" = 1;"name" = "CONTACT";}' \
+  '{"enabled" = 1;"name" = "EVENT_TODO";}' \
+  '{"enabled" = 0;"name" = "IMAGES";}' \
+  '{"enabled" = 0;"name" = "BOOKMARKS";}' \
+  '{"enabled" = 0;"name" = "MUSIC";}' \
+  '{"enabled" = 0;"name" = "MOVIES";}' \
+  '{"enabled" = 0;"name" = "PRESENTATIONS";}' \
+  '{"enabled" = 0;"name" = "SPREADSHEETS";}' \
+  '{"enabled" = 0;"name" = "SOURCE";}' \
+  '{"enabled" = 0;"name" = "MENU_DEFINITION";}' \
+  '{"enabled" = 0;"name" = "MENU_OTHER";}' \
+  '{"enabled" = 0;"name" = "MENU_CONVERSION";}' \
+  '{"enabled" = 0;"name" = "MENU_EXPRESSION";}' \
+  '{"enabled" = 0;"name" = "MENU_WEBSEARCH";}' \
+  '{"enabled" = 0;"name" = "MENU_SPOTLIGHT_SUGGESTIONS";}'
+# REMOVED categories (dead keys, kept as comments):
+# MENU_DEFINITION, MENU_SPOTLIGHT_SUGGESTIONS have been de-listed in Tahoe UI
+# but the key names are kept above since they may suppress legacy behavior.
+
+# Load new settings before rebuilding the index
+killall mds > /dev/null 2>&1
+
+# Make sure indexing is enabled for the main volume
+sudo mdutil -i on / > /dev/null
+
+# Rebuild the index from scratch
+sudo mdutil -E / > /dev/null
+
+# Spotlight Clipboard History — enable and set retention period. [VERIFIED-26]
+# This is OFF by default (Apple cites privacy concerns for shared Macs).
+# Retention options in 26.1+: "30m", "8h", "7d"
+# The exact defaults key has not been publicly confirmed as of 26.3;
+# the setting lives in System Settings → Spotlight → Clipboard Search.
+# Enable it manually or via GUI automation. Do NOT guess the key.
+# If you discover the key via `defaults read` diff, add it here.
+
+
+###############################################################################
+# Safari & WebKit                                                             #
+###############################################################################
+
+# NOTE: Safari's defaults keys have become increasingly restricted since
+# Catalina. Many keys that worked in older macOS require TCC/Full Disk Access
+# permissions or are simply ignored. The keys below are the ones most likely
+# to still work as of Tahoe 26.3, based on community reports.
+#
+# CONFIRMED REMOVED in Tahoe / recent Safari:
+#   - ShowSidebarInTopSites (Top Sites removed)
+#   - DebugSnapshotsUpdatePolicy (Top Sites history cache gone)
+#   - WebKitPluginsEnabled / WebKit2PluginsEnabled (NPAPI plugins long dead)
+#   - WebKitJavaEnabled / WebKit2JavaEnabled (Java plugin long dead)
+#   - CompactTabBar setting (removed in 26.0, returns in 26.4)
+
+# Don't send search queries to Apple. [LIKELY-OK]
+defaults write com.apple.Safari UniversalSearchEnabled -bool false
+defaults write com.apple.Safari SuppressSearchSuggestions -bool true
+
+# Show the full URL in the address bar. [LIKELY-OK]
+defaults write com.apple.Safari ShowFullURLInSmartSearchField -bool true
+
+# Set Safari's home page to about:blank for faster loading. [LIKELY-OK]
+defaults write com.apple.Safari HomePage -string "about:blank"
+
+# Prevent Safari from opening 'safe' files automatically after downloading. [LIKELY-OK]
+defaults write com.apple.Safari AutoOpenSafeDownloads -bool false
+
+# Hide Safari's bookmarks bar by default. [LIKELY-OK]
+defaults write com.apple.Safari ShowFavoritesBar -bool false
+
+# Enable Safari's debug menu. [LIKELY-OK]
+defaults write com.apple.Safari IncludeInternalDebugMenu -bool true
+
+# Make Safari's search banners default to Contains instead of Starts With. [LIKELY-OK]
+defaults write com.apple.Safari FindOnPageMatchesWordStartsOnly -bool false
+
+# Enable the Develop menu and the Web Inspector in Safari. [LIKELY-OK]
+# Note: In Tahoe, enabling Develop menu may also require enabling it once
+# through the UI the first time (Safari → Settings → Advanced).
+defaults write com.apple.Safari IncludeDevelopMenu -bool true
+defaults write com.apple.Safari WebKitDeveloperExtrasEnabledPreferenceKey -bool true
+defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2DeveloperExtrasEnabled -bool true
+
+# Add a context menu item for showing the Web Inspector in web views. [LIKELY-OK]
+defaults write NSGlobalDomain WebKitDeveloperExtras -bool true
+
+# Enable continuous spellchecking. [LIKELY-OK]
+defaults write com.apple.Safari WebContinuousSpellCheckingEnabled -bool true
+
+# Disable auto-correct. [LIKELY-OK]
+defaults write com.apple.Safari WebAutomaticSpellingCorrectionEnabled -bool false
+
+# Disable AutoFill. [LIKELY-OK]
+defaults write com.apple.Safari AutoFillFromAddressBook -bool false
+defaults write com.apple.Safari AutoFillPasswords -bool false
+defaults write com.apple.Safari AutoFillCreditCardData -bool false
+defaults write com.apple.Safari AutoFillMiscellaneousForms -bool false
+
+# Warn about fraudulent websites. [LIKELY-OK]
+defaults write com.apple.Safari WarnAboutFraudulentWebsites -bool true
+
+# Block pop-up windows. [LIKELY-OK]
+defaults write com.apple.Safari WebKitJavaScriptCanOpenWindowsAutomatically -bool false
+defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaScriptCanOpenWindowsAutomatically -bool false
+
+# Update extensions automatically. [LIKELY-OK]
+defaults write com.apple.Safari InstallExtensionUpdatesAutomatically -bool true
+
+# Enable Tab key to highlight each item on a web page. [LIKELY-OK]
+defaults write com.apple.Safari WebKitTabToLinksPreferenceKey -bool true
+defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2TabsToLinks -bool true
+
+
+###############################################################################
+# Mail                                                                        #
+###############################################################################
+
+# Disable send and reply animations. [LIKELY-OK]
+defaults write com.apple.mail DisableReplyAnimations -bool true
+defaults write com.apple.mail DisableSendAnimations -bool true
+
+# Copy email addresses as foo@example.com instead of Foo Bar <foo@example.com>. [LIKELY-OK]
+defaults write com.apple.mail AddressesIncludeNameOnPasteboard -bool false
+
+# Add keyboard shortcut ⌘+Enter to send email. [LIKELY-OK]
+defaults write com.apple.mail NSUserKeyEquivalents -dict-add "Send" "@\U21a9"
+
+# Display emails in threaded mode, sorted by date (oldest at top). [LIKELY-OK]
+defaults write com.apple.mail DraftsViewerAttributes -dict-add "DisplayInThreadedMode" -string "yes"
+defaults write com.apple.mail DraftsViewerAttributes -dict-add "SortedDescending" -string "no"
+defaults write com.apple.mail DraftsViewerAttributes -dict-add "SortOrder" -string "received-date"
+
+# Disable inline attachments (just show icons). [LIKELY-OK]
+defaults write com.apple.mail DisableInlineAttachmentViewing -bool true
+
+# Disable automatic spell checking. [LIKELY-OK]
+defaults write com.apple.mail SpellCheckingBehavior -string "NoSpellCheckingEnabled"
+
+
+###############################################################################
+# Terminal                                                                    #
+###############################################################################
+
+# NOTE: Terminal received a significant redesign in Tahoe with Liquid Glass
+# styling and now supports 24-bit color and Powerline fonts natively.
+# The old Solarized theme setup from Mathias's script is personal preference
+# and has been removed from this template. Set your theme via the Terminal
+# Settings UI or by double-clicking a .terminal file.
+
+# Only use UTF-8 in Terminal.app. [LIKELY-OK]
+defaults write com.apple.terminal StringEncodings -array 4
+
+# Enable Secure Keyboard Entry in Terminal.app. [VERIFIED-26]
+defaults write com.apple.terminal SecureKeyboardEntry -bool true
+
+# Disable the annoying line marks (shell integration dividers). [LIKELY-OK]
+defaults write com.apple.Terminal ShowLineMarks -int 0
+
+# iTerm2: Don't show the annoying quit prompt. [LIKELY-OK if iTerm2 installed]
+# defaults write com.googlecode.iterm2 PromptOnQuit -bool false
+
+
+###############################################################################
+# Time Machine                                                                #
+###############################################################################
+
+# Prevent Time Machine from prompting to use new hard drives as backup. [LIKELY-OK]
+defaults write com.apple.TimeMachine DoNotOfferNewDisksForBackup -bool true
+
+# REMOVED: `tmutil disablelocal` was removed from macOS a long time ago
+# (around Sierra). It is not available on Tahoe. [REMOVED-OLDER]
+# hash tmutil &> /dev/null && sudo tmutil disablelocal
+
+# NOTE: Time Machine has had stability issues in Tahoe 26.2 and 26.3.
+# If you use an encrypted backup volume, check Apple support notes before
+# upgrading. The `tmutil` command still works for other operations.
+
+
+###############################################################################
+# Activity Monitor                                                            #
+###############################################################################
+
+# Show the main window when launching Activity Monitor. [LIKELY-OK]
+defaults write com.apple.ActivityMonitor OpenMainWindow -bool true
+
+# Visualize CPU usage in the Activity Monitor Dock icon.
+# 0=Application Icon, 1=Network Usage, 2=Disk Activity, 3=Memory Usage, 5=CPU Usage. [LIKELY-OK]
+defaults write com.apple.ActivityMonitor IconType -int 5
+
+# Show all processes in Activity Monitor. [LIKELY-OK]
+defaults write com.apple.ActivityMonitor ShowCategory -int 0
+
+# Sort Activity Monitor results by CPU usage. [LIKELY-OK]
+defaults write com.apple.ActivityMonitor SortColumn -string "CPUUsage"
+defaults write com.apple.ActivityMonitor SortDirection -int 0
+
+
+###############################################################################
+# TextEdit, Disk Utility, QuickTime                                           #
+###############################################################################
+
+# Use plain text mode for new TextEdit documents. [LIKELY-OK]
+defaults write com.apple.TextEdit RichText -int 0
+
+# Open and save files as UTF-8 in TextEdit. [LIKELY-OK]
+defaults write com.apple.TextEdit PlainTextEncoding -int 4
+defaults write com.apple.TextEdit PlainTextEncodingForWrite -int 4
+
+# Enable the debug menu in Disk Utility. [LIKELY-OK]
+defaults write com.apple.DiskUtility DUDebugMenuEnabled -bool true
+defaults write com.apple.DiskUtility advanced-image-options -bool true
+
+# Auto-play videos when opened with QuickTime Player. [LIKELY-OK]
+defaults write com.apple.QuickTimePlayerX MGPlayMovieOnOpen -bool true
+
+# REMOVED: Dashboard dev mode (Dashboard was removed in Catalina). [REMOVED-OLDER]
+# defaults write com.apple.dashboard devmode -bool true
+
+# REMOVED: iCal debug menu (key still exists but the app is now Calendar,
+# and this debug menu has no useful function in modern macOS). [REMOVED-OLDER]
+# defaults write com.apple.iCal IncludeDebugMenu -bool true
+
+# REMOVED: Address Book debug menu (Contacts has no such menu in Tahoe). [REMOVED-OLDER]
+# defaults write com.apple.addressbook ABShowDebugMenu -bool true
+
+
+###############################################################################
+# Mac App Store                                                               #
+###############################################################################
+
+# Enable the WebKit Developer Tools in the Mac App Store. [UNCERTAIN]
+defaults write com.apple.appstore WebKitDeveloperExtras -bool true
+
+# Enable Debug Menu in the Mac App Store. [UNCERTAIN]
+defaults write com.apple.appstore ShowDebugMenu -bool true
+
+# Enable the automatic update check. [LIKELY-OK]
+defaults write com.apple.SoftwareUpdate AutomaticCheckEnabled -bool true
+
+# Check for software updates daily. [UNCERTAIN]
+# The key `ScheduleFrequency` was changed/deprecated in Ventura.
+# Setting this may have no effect on Tahoe. Use System Settings instead.
+# defaults write com.apple.SoftwareUpdate ScheduleFrequency -int 1
+
+# Download newly available updates in background. [LIKELY-OK]
+defaults write com.apple.SoftwareUpdate AutomaticDownload -int 1
+
+# Install System data files & security updates. [LIKELY-OK]
+defaults write com.apple.SoftwareUpdate CriticalUpdateInstall -int 1
+
+# Turn on app auto-update. [LIKELY-OK]
+defaults write com.apple.commerce AutoUpdate -bool true
+
+# Allow the App Store to reboot on macOS updates. [UNCERTAIN]
+defaults write com.apple.commerce AutoUpdateRestartRequired -bool true
+
+
+###############################################################################
+# Photos                                                                      #
+###############################################################################
+
+# Prevent Photos from opening automatically when devices are plugged in. [LIKELY-OK]
+defaults -currentHost write com.apple.ImageCapture disableHotPlug -bool true
+
+
+###############################################################################
+# Messages                                                                    #
+###############################################################################
+
+# Disable automatic emoji substitution (use plain text smileys). [LIKELY-OK]
+defaults write com.apple.messageshelper.MessageController SOInputLineSettings \
+  -dict-add "automaticEmojiSubstitutionEnablediMessage" -bool false
+
+# Disable smart quotes in Messages. [LIKELY-OK]
+defaults write com.apple.messageshelper.MessageController SOInputLineSettings \
+  -dict-add "automaticQuoteSubstitutionEnabled" -bool false
+
+# Disable continuous spell checking in Messages. [LIKELY-OK]
+defaults write com.apple.messageshelper.MessageController SOInputLineSettings \
+  -dict-add "continuousSpellCheckingEnabled" -bool false
+
+
+###############################################################################
+# Google Chrome                                                               #
+###############################################################################
+
+# Disable the too-sensitive backswipe on trackpads. [LIKELY-OK]
+defaults write com.google.Chrome AppleEnableSwipeNavigateWithScrolls -bool false
+defaults write com.google.Chrome.canary AppleEnableSwipeNavigateWithScrolls -bool false
+
+# Disable the too-sensitive backswipe on Magic Mouse. [LIKELY-OK]
+defaults write com.google.Chrome AppleEnableMouseSwipeNavigateWithScrolls -bool false
+defaults write com.google.Chrome.canary AppleEnableMouseSwipeNavigateWithScrolls -bool false
+
+# Use the system-native print preview dialog. [LIKELY-OK]
+defaults write com.google.Chrome DisablePrintPreview -bool true
+defaults write com.google.Chrome.canary DisablePrintPreview -bool true
+
+# Expand the print dialog by default. [LIKELY-OK]
+defaults write com.google.Chrome PMPrintingExpandedStateForPrint2 -bool true
+defaults write com.google.Chrome.canary PMPrintingExpandedStateForPrint2 -bool true
+
+
+###############################################################################
+# Transmission.app                                                            #
+###############################################################################
+
+# Use ~/Downloads to store incomplete downloads. [LIKELY-OK]
+defaults write org.m0k.transmission UseIncompleteDownloadFolder -bool true
+defaults write org.m0k.transmission IncompleteDownloadFolder -string "${HOME}/Downloads/Incomplete"
+
+# Use ~/Downloads to store completed downloads. [LIKELY-OK]
+defaults write org.m0k.transmission DownloadLocationConstant -bool true
+
+# Don't prompt for confirmation before downloading. [LIKELY-OK]
+defaults write org.m0k.transmission DownloadAsk -bool false
+defaults write org.m0k.transmission MagnetOpenAsk -bool false
+
+# Trash original torrent files. [LIKELY-OK]
+defaults write org.m0k.transmission DeleteOriginalTorrent -bool true
+
+# Hide the donate message. [LIKELY-OK]
+defaults write org.m0k.transmission WarningDonate -bool false
+
+# Hide the legal disclaimer. [LIKELY-OK]
+defaults write org.m0k.transmission WarningLegal -bool false
+
+# Randomize port on launch. [LIKELY-OK]
+defaults write org.m0k.transmission RandomPort -bool true
+
+
+###############################################################################
+# Dead App Sections (kept for reference only)                                 #
+###############################################################################
+
+# The following apps/features no longer exist or have changed significantly.
+# These sections are preserved as comments so you know what was removed and why.
+
+# ── Twitter.app ──────────────────────────────────────────────────────────
+# Twitter.app became X.app; the old bundle ID (com.twitter.twitter-mac)
+# is gone. The new X app does not expose the same defaults keys.
+# [REMOVED-OLDER]
+
+# ── Tweetbot.app ─────────────────────────────────────────────────────────
+# Tweetbot for Mac was discontinued in 2023 following Twitter's API changes.
+# [REMOVED-OLDER]
+
+# ── SizeUp.app ───────────────────────────────────────────────────────────
+# SizeUp has not been updated for Tahoe. If you use it, the defaults keys
+# (com.irradiatedsoftware.SizeUp) may still work but are not verified.
+# Consider alternatives: Magnet, Rectangle, Moom, or built-in macOS tiling.
+# [UNCERTAIN]
+
+# ── Spectacle.app ────────────────────────────────────────────────────────
+# Spectacle is no longer maintained. Use Rectangle (open source) instead.
+# [REMOVED-OLDER]
+
+# ── GPGMail ──────────────────────────────────────────────────────────────
+# GPGMail still exists but the defaults path has changed. Consult the
+# GPG Suite documentation for current configuration options.
+# [UNCERTAIN]
+
+# ── Opera/Opera Developer ────────────────────────────────────────────────
+# These keys (com.operasoftware.Opera) likely still work if you use Opera.
+# Not tested on Tahoe. [UNCERTAIN]
+
+
+###############################################################################
+# Kill affected applications                                                  #
+###############################################################################
+
+for app in \
+  "Activity Monitor" \
+  "Calendar" \
+  "cfprefsd" \
+  "Contacts" \
+  "Dock" \
+  "Finder" \
+  "Google Chrome Canary" \
+  "Google Chrome" \
+  "Mail" \
+  "Messages" \
+  "Photos" \
+  "Safari" \
+  "SystemUIServer" \
+  "Terminal" \
+  "Transmission"; do
+  killall "${app}" &> /dev/null
+done
+
+echo ""
+echo "Done."
+echo ""
+echo "Notes:"
+echo "  • Some changes require a full logout or restart to take effect."
+echo "  • If Safari keys didn't apply, open System Settings → Privacy &"
+echo "    Security and grant Full Disk Access to Terminal, then re-run."
+echo "  • Liquid Glass settings (System Settings → Appearance) cannot be"
+echo "    fully controlled via defaults write as of macOS 26.3."
+echo "  • Clipboard History duration is set via System Settings → Spotlight."
+echo "  • Folder colors in Tahoe are managed via Tags, not defaults keys."
